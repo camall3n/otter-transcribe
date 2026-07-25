@@ -303,3 +303,35 @@ def test_a_speaker_rule_also_applies_when_interleaving(tmp_path):
     fixed, _ = run_merge(tmp_path / "y", {"a": a, "b": b}, config, output="2.txt")
     assert any(s == "ADA" for s, _ in turns(fixed)), \
         f"rule ignored on the interleave path: {[s for s, _ in turns(fixed)]}"
+
+
+def test_saved_documents_carry_no_credentials_or_emails():
+    """Otter's speech document embeds live credentials; we save it to disk.
+
+    `audio_url` is a presigned S3 URL holding an AWS temporary access key --
+    one reached a public repo on 2026-07-25 and was flagged by GitHub's secret
+    scanner. The fetch boundary must drop it, and everything like it.
+    """
+    from otter.fetch import scrub
+
+    doc = {
+        "title": "t", "duration": 1, "transcripts": [], "process_failed": False,
+        "speech_processing_state": 4,
+        "audio_url": "https://s3/x.mp3?AWSAccessKeyId=ASIA5XEXAMPLE0000000&Signature=s",
+        "download_url": "https://s3/y.mp3?AWSAccessKeyId=ASIA5XEXAMPLE0000000",
+        "pubsub_jwt": "eyJhbGciOiJIUzI1NiJ9.e30.sig",
+        "owner": {"email": "someone@example.com"},
+        "shared_emails": ["someone@example.com"],
+        "calendar_guests": [{"email": "someone@example.com"}],
+        "speakers": [{"id": 1, "speaker_name": "Ada",
+                      "speaker_email": "ada@example.com", "user_id": 42}],
+    }
+    blob = json.dumps(scrub(doc))
+    for leak in ("ASIA", "AWSAccessKeyId", "Signature=", "eyJhbGci",
+                 "@example.com", "pubsub", "user_id"):
+        assert leak not in blob, f"{leak!r} survived the scrub: {blob}"
+
+    kept = scrub(doc)
+    assert kept["title"] == "t" and kept["duration"] == 1
+    assert kept["speakers"] == [{"id": 1, "speaker_name": "Ada"}], \
+        "the merge needs speaker id and name; scrub must keep exactly those"

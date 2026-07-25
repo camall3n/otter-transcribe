@@ -162,9 +162,38 @@ def speeches(otter: Otter, page_size: int = 45, folder: int = 0) -> list[dict]:
     return items
 
 
-def speech(otter: Otter, otid: str) -> dict:
-    """The full transcript document, including per-word `alignment` timings.
+# Otter returns ~109 fields per speech. Most are account state, and several
+# are live credentials: `audio_url` is a presigned S3 URL whose query string
+# carries an AWS temporary access key and signature, `pubsub_jwt` is a bearer
+# token, and `owner`/`shared_emails`/`calendar_guests` name real people. We
+# save these documents to disk, so we keep only what the merge reads -- an
+# allowlist, because the next field Otter adds should be dropped by default.
+# (2026-07-25: an untrimmed document reached a public repo and GitHub's secret
+# scanner flagged the AWS key inside `audio_url`.)
+SPEECH_FIELDS = frozenset({
+    "duration", "process_failed", "speakers", "speech_processing_state",
+    "title", "transcripts",
+})
+SPEAKER_FIELDS = frozenset({"id", "speaker_name"})
 
+
+def scrub(doc: dict) -> dict:
+    """Strip a speech document to the fields the pipeline actually uses."""
+    kept = {k: v for k, v in doc.items() if k in SPEECH_FIELDS}
+    speakers = kept.get("speakers")
+    if isinstance(speakers, list):
+        kept["speakers"] = [
+            {k: v for k, v in s.items() if k in SPEAKER_FIELDS}
+            if isinstance(s, dict) else s
+            for s in speakers
+        ]
+    return kept
+
+
+def speech(otter: Otter, otid: str) -> dict:
+    """The transcript document, including per-word `alignment` timings.
+
+    Scrubbed to the fields the merge reads -- see `scrub`.
     This is what the merge is built on -- see otter/speech.py.
     """
     response = otter.session.get(API + "speech",
@@ -174,7 +203,7 @@ def speech(otter: Otter, otid: str) -> dict:
     doc = response.json().get("speech")
     if not doc:
         raise OtterError(f"no speech in response for {otid}")
-    return doc
+    return scrub(doc)
 
 
 # --------------------------------------------------------------------------
