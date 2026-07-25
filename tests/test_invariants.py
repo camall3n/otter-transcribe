@@ -317,8 +317,8 @@ def test_saved_documents_carry_no_credentials_or_emails():
     doc = {
         "title": "t", "duration": 1, "transcripts": [], "process_failed": False,
         "speech_processing_state": 4,
-        "audio_url": "https://s3/x.mp3?AWSAccessKeyId=ASIA5XEXAMPLE0000000&Signature=s",
-        "download_url": "https://s3/y.mp3?AWSAccessKeyId=ASIA5XEXAMPLE0000000",
+        "audio_url": "https://s3/x.mp3?AWSAccessKeyId=ASIA-EXAMPLE-NOT-A-REAL-KEY&Signature=s",
+        "download_url": "https://s3/y.mp3?AWSAccessKeyId=ASIA-EXAMPLE-NOT-A-REAL-KEY",
         "pubsub_jwt": "eyJhbGciOiJIUzI1NiJ9.e30.sig",
         "owner": {"email": "someone@example.com"},
         "shared_emails": ["someone@example.com"],
@@ -335,3 +335,53 @@ def test_saved_documents_carry_no_credentials_or_emails():
     assert kept["title"] == "t" and kept["duration"] == 1
     assert kept["speakers"] == [{"id": 1, "speaker_name": "Ada"}], \
         "the merge needs speaker id and name; scrub must keep exactly those"
+
+
+def test_every_saved_speech_document_goes_through_the_scrub():
+    """The scrub sits at the save boundary, so every save must use it.
+
+    A source check rather than a behavioural one: the risk is a *new* write
+    site added later that forgets, and no fixture can fail for code that does
+    not exist yet.
+    """
+    source = (ROOT / "otter" / "fetch.py").read_text()
+    saves = re.findall(r"write_text\(json\.dumps\((.*?)\), encoding", source)
+    speech_saves = [s for s in saves if "config" not in s]
+    assert speech_saves, "no speech-document save sites found; did they move?"
+    unscrubbed = [s for s in speech_saves if not s.startswith("scrub(")]
+    assert not unscrubbed, f"save sites bypassing the scrub: {unscrubbed}"
+
+
+def test_a_single_recording_needs_no_merge(tmp_path):
+    """One recording must not be routed to reconciliation.
+
+    The pairwise overlap check asks whether every pair of tracks overlaps.
+    With one track there are no pairs, so the answer is vacuously yes and a
+    lone recording was sent to `reconcile`, which refuses anything under two.
+    """
+    from otter.fetch import choose_strategy
+
+    a, _ = separate_mics()
+    mode, _, why = choose_strategy({"only": a})
+    assert mode == "interleave", f"a single recording chose {mode!r}: {why}"
+
+
+def test_a_scrubbed_document_still_reads_as_finished():
+    """The scrub must not blind the poller to a recording that is done.
+
+    `ready()` gates on four boolean flags. An allowlist that drops them makes
+    every recording look permanently unfinished, so `wait()` polls until it
+    times out on work Otter finished minutes earlier.
+    """
+    from otter.fetch import ready, scrub
+
+    finished = {
+        "upload_finished": True, "process_finished": True,
+        "diarization_finished": True, "realign_finished": True,
+        "process_failed": False, "speech_processing_state": "ALL_DONE",
+        "duration": 700, "title": "t", "transcripts": [], "speakers": [],
+        "audio_url": "https://s3/x.mp3?AWSAccessKeyId=ASIA-EXAMPLE-NOT-A-REAL-KEY",
+    }
+    assert ready(finished)[0], "fixture is wrong: the raw document is finished"
+    done, state = ready(scrub(finished))
+    assert done, f"scrub hid the readiness flags; poller would spin: {state}"

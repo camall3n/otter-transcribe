@@ -166,13 +166,24 @@ def speeches(otter: Otter, page_size: int = 45, folder: int = 0) -> list[dict]:
 # are live credentials: `audio_url` is a presigned S3 URL whose query string
 # carries an AWS temporary access key and signature, `pubsub_jwt` is a bearer
 # token, and `owner`/`shared_emails`/`calendar_guests` name real people. We
-# save these documents to disk, so we keep only what the merge reads -- an
-# allowlist, because the next field Otter adds should be dropped by default.
+# save these documents to disk, so we keep only what a saved document needs --
+# an allowlist, because the next field Otter adds should be dropped by default.
 # (2026-07-25: an untrimmed document reached a public repo and GitHub's secret
 # scanner flagged the AWS key inside `audio_url`.)
+#
+# This runs where a document is WRITTEN, not where it is fetched. Scrubbing on
+# fetch put every in-memory reader inside the blast radius for no benefit: the
+# leak was a committed file, but dropping the flags `ready()` polls on made
+# every recording look permanently unfinished, and `wait()` spun for an hour
+# on work Otter had already finished. At the save boundary the live document
+# stays whole, and getting this list wrong can only break offline `merge` --
+# loudly, immediately, and covered by the example tests.
 SPEECH_FIELDS = frozenset({
     "duration", "process_failed", "speakers", "speech_processing_state",
     "title", "transcripts",
+    # kept so a saved document still shows how the recording finished
+    "upload_finished", "process_finished", "diarization_finished",
+    "realign_finished",
 })
 SPEAKER_FIELDS = frozenset({"id", "speaker_name"})
 
@@ -203,7 +214,7 @@ def speech(otter: Otter, otid: str) -> dict:
     doc = response.json().get("speech")
     if not doc:
         raise OtterError(f"no speech in response for {otid}")
-    return scrub(doc)
+    return doc
 
 
 # --------------------------------------------------------------------------
@@ -477,7 +488,7 @@ def cmd_pull(args) -> int:
         docs[otid] = doc
         if args.dir:
             out = Path(args.dir) / f"{otid}.json"
-            out.write_text(json.dumps(doc), encoding="utf-8")
+            out.write_text(json.dumps(scrub(doc)), encoding="utf-8")
             print(f"wrote {out}", file=sys.stderr)
         print(f"  {otid}: {len(doc.get('transcripts') or [])} segments, "
               f"{ts(float(doc.get('duration') or 0))}", file=sys.stderr)
@@ -653,6 +664,12 @@ def choose_strategy(docs: dict[str, dict]) -> tuple[str, float | None, str]:
     """
     streams = {name: word_stream(doc) for name, doc in docs.items()}
 
+    if len(docs) < 2:
+        # There is nothing to merge, and the pairwise check below would say
+        # "reconcile": with one recording there are no pairs, so "every pair
+        # overlaps" is vacuously true and reconciliation then refuses the job.
+        return "interleave", None, "a single recording, so there is nothing to merge"
+
     if len(docs) != 2:
         # Reconciliation is pairwise, so more than two tracks always
         # interleaves. That is right for a Zoom recording with four
@@ -809,7 +826,7 @@ def cmd_run(args) -> int:
         print(f"  {otid}: ready", file=sys.stderr)
         if args.dir:
             out = Path(args.dir) / f"{otid}.json"
-            out.write_text(json.dumps(docs[otid]), encoding="utf-8")
+            out.write_text(json.dumps(scrub(docs[otid])), encoding="utf-8")
             print(f"  saved {out}", file=sys.stderr)
     return _merge(docs, args)
 

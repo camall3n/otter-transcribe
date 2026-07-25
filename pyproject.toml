@@ -10,3 +10,14 @@ dependencies = [
 dev = [
     "pytest>=9.1.1",
 ]
+
+# Without a build system this is a "virtual" project: uv installs the
+# dependencies but never the `otter` package, so `python -m otter.fetch`
+# resolves only when the working directory happens to be the repo root.
+# Every command run from a transcript folder failed on that.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["otter"]

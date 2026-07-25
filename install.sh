@@ -26,9 +26,11 @@ else
            "$candidate" -c 'import sys; sys.exit(0 if sys.version_info >= (3,12) else 1)'; then
             "$candidate" -m venv .venv
             ./.venv/bin/pip install --quiet --upgrade pip
-            ./.venv/bin/pip install --quiet requests
+            # -e . rather than `requests`: installs the dependencies *and* the
+            # otter package, so the commands work from any directory.
+            ./.venv/bin/pip install --quiet -e .
             PY="./.venv/bin/python"
-            ok "$candidate -> .venv, requests installed"
+            ok "$candidate -> .venv, otter installed"
             break
         fi
     done
