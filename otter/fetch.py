@@ -8,10 +8,8 @@ here rather than through the package, for two reasons: its download writes to
 disk when what we want is an in-memory document, and depending on nothing but
 `requests` keeps this installable anywhere without a fork to maintain.
 
-Transcripts come from the `speech` endpoint, not the SRT export. Otter's API
-SRT is segmented by speaker turn -- a single cue ran 11m40s on a two-person
-call -- which destroys interleaving beyond repair. `speech` carries per-word
-timings instead. See otter/speech.py.
+Transcripts come from the `speech` endpoint, which carries per-word timings.
+See otter/speech.py for why nothing else will do.
 
 Because these are private endpoints, they can change without notice. Every
 call checks its response shape and says so loudly rather than half-working.
@@ -46,13 +44,12 @@ Credentials never pass through here as arguments -- see otter/credentials.py.
 from __future__ import annotations
 
 import argparse
-import io
+import hashlib
 import json
 import re
 import sys
 import time
 import xml.etree.ElementTree as ET
-import zipfile
 from dataclasses import dataclass
 from datetime import datetime
 from itertools import combinations
@@ -64,13 +61,12 @@ from otter.credentials import (COOKIE_FILE, CredentialError, Credentials,
                                cookies_from_curl, resolve)
 from otter.speech import (GAP_SECONDS, build, is_placeholder,
                           observed_speakers, tracks_from_speeches)
-from otter.reconcile import (cues_from_merged, estimate_offset, fold,
-                             reconcile, word_stream)
-from otter.transcript import group_turns, render_text, ts
+from otter.reconcile import (aliases_for, cues_from_merged, estimate_offset,
+                             fold, reconcile, word_stream)
+from otter.transcript import correct_speakers, group_turns, render_text, ts
 
 API = "https://otter.ai/forward/api/v1/"
 S3_UPLOAD_URL = "https://s3.us-west-2.amazonaws.com/speech-upload-prod"
-ZIP_MAGIC = b"PK\x03\x04"
 
 
 class OtterError(RuntimeError):
@@ -169,7 +165,7 @@ def speeches(otter: Otter, page_size: int = 45, folder: int = 0) -> list[dict]:
 def speech(otter: Otter, otid: str) -> dict:
     """The full transcript document, including per-word `alignment` timings.
 
-    This, not the SRT export, is what the merge is built on -- see otter/speech.py.
+    This is what the merge is built on -- see otter/speech.py.
     """
     response = otter.session.get(API + "speech",
                                  params={"userid": otter.userid, "otid": otid})
@@ -179,33 +175,6 @@ def speech(otter: Otter, otid: str) -> dict:
     if not doc:
         raise OtterError(f"no speech in response for {otid}")
     return doc
-
-
-def export(otter: Otter, otid: str, fmt: str = "srt") -> str:
-    """Download one export as text, in memory.
-
-    `bulk_export` returns the bare file for a single format and a zip for
-    several, so unwrap a zip if that is what arrives.
-    """
-    response = otter.session.post(
-        API + "bulk_export",
-        params={"userid": otter.userid},
-        headers={"x-csrftoken": otter.csrf, "referer": "https://otter.ai/"},
-        data={"formats": fmt, "speech_otid_list": [otid]})
-    if not response.ok:
-        raise OtterError(
-            f"export of {otid} failed: HTTP {response.status_code}. "
-            "SRT export is gated to paid plans; check the otid is exactly the "
-            "`otid` field from `list`, not the numeric id.")
-
-    body = response.content
-    if body.startswith(ZIP_MAGIC):
-        with zipfile.ZipFile(io.BytesIO(body)) as archive:
-            names = [n for n in archive.namelist() if n.lower().endswith("." + fmt)]
-            if not names:
-                raise OtterError(f"zip held no .{fmt}; contents={archive.namelist()}")
-            body = archive.read(names[0])
-    return body.decode("utf-8-sig")
 
 
 # --------------------------------------------------------------------------
@@ -469,6 +438,8 @@ def cmd_probe(args) -> int:
 def cmd_pull(args) -> int:
     """Fetch speech documents and optionally merge them in one step."""
     otter = connect()
+    default_paths(args, args.otids)
+    prepare_destinations(args)
     deadline = time.monotonic() + args.timeout
     docs = {}
     for otid in args.otids:
@@ -706,12 +677,20 @@ def _merge(docs: dict[str, dict], args) -> int:
 
     if mode == "reconcile":
         a_doc, b_doc = (list(docs.values()) + [None, None])[:2]
-        aliases = config.get("aliases", {})
-        merged = (fold([word_stream(d, aliases=aliases) for d in docs.values()],
-                       log=lambda m: print(m, file=sys.stderr)) if offset is None
-                  else reconcile(word_stream(a_doc, aliases=aliases),
-                                 word_stream(b_doc, -offset, aliases), tuple(docs)))
-        turns = group_turns(cues_from_merged(merged, "reconciled"))
+        names = config.get("tracks", {})
+        al = lambda otid: aliases_for(config, names.get(otid, otid))
+        keys = list(docs)
+        streams = [word_stream(d, aliases=al(k)) for k, d in docs.items()]
+        if config.get("offset") is not None:      # only an explicit override
+            merged = reconcile(word_stream(a_doc, aliases=al(keys[0])),
+                               word_stream(b_doc, -config["offset"], al(keys[1])),
+                               tuple(docs))
+        else:
+            # fold, even for a pair: it puts the earliest recording first, so
+            # the answer does not depend on the order they were named.
+            merged = fold(streams, keys, log=lambda m: print(m, file=sys.stderr))
+        turns = group_turns(correct_speakers(
+            cues_from_merged(merged, "reconciled"), config))
     else:
         tracks = tracks_from_speeches(docs, config)
         _, turns = build(tracks, config)
@@ -719,6 +698,61 @@ def _merge(docs: dict[str, dict], args) -> int:
     print(f"wrote {args.output}: {len(turns)} turns, {ts(turns[-1].end)} total",
           file=sys.stderr)
     return 0
+
+
+SESSION_ROOT = Path("transcripts")
+
+
+def session_dir(labels: list[str]) -> Path:
+    """A stamped folder for one run, so a second never lands on the first.
+
+    Everything a run produces belongs together -- the transcript, the config
+    recording every decision, and the documents Otter returned. Flat in one
+    directory, a second recording of the same meeting silently overwrote the
+    first, and there is no natural key: the same conversation transcribed
+    twice is two different things.
+
+    Named by time and a short hash rather than by the recordings, so a folder
+    listing never carries a participant's name.
+    """
+    stamp = datetime.now().strftime("%Y-%m-%d-%H%M")
+    seed = "|".join(labels) + stamp + str(time.time_ns())
+    digest = hashlib.sha256(seed.encode()).hexdigest()[:6]
+    target, n = SESSION_ROOT / f"{stamp}-{digest}", 2
+    while target.exists():
+        target, n = target.with_name(f"{stamp}-{digest}-{n}"), n + 1
+    return target
+
+
+def default_paths(args, labels: list[str]) -> None:
+    """Fill in -o/-c/-d from a stamped folder when the caller gave none."""
+    if getattr(args, "output", None):
+        return
+    where = session_dir(labels)
+    args.output = str(where / "transcript.txt")
+    args.config = args.config or str(where / "config.json")
+    args.dir = args.dir or str(where)
+    print(f"  writing to {where}/", file=sys.stderr)
+
+
+def prepare_destinations(args) -> None:
+    """Make the output directories, and fail now rather than after uploading.
+
+    `run` uploads first and writes last, so a missing output directory used to
+    surface only once the recordings were already in Otter -- quota spent, and
+    a crash instead of a transcript. Anything that would stop the result being
+    written is checked here, before the first byte is sent.
+    """
+    try:
+        for target in (getattr(args, "output", None), getattr(args, "config", None)):
+            if target:
+                Path(target).parent.mkdir(parents=True, exist_ok=True)
+        if getattr(args, "dir", None):
+            Path(args.dir).mkdir(parents=True, exist_ok=True)
+        if getattr(args, "output", None):
+            Path(args.output).touch(exist_ok=True)
+    except OSError as exc:
+        raise OtterError(f"  cannot write there: {exc}")
 
 
 def cmd_run(args) -> int:
@@ -730,6 +764,8 @@ def cmd_run(args) -> int:
     strands work -- `pull <otid> ... --wait` picks up exactly where this left.
     """
     otter = connect()
+    default_paths(args, [Path(p).stem for p in args.paths])
+    prepare_destinations(args)      # before spending any upload quota
     otids = []
     for path in args.paths:
         otid = upload(otter, path)
@@ -756,6 +792,31 @@ def cmd_tag(args) -> int:
     tag(otter, args.otid, pairs, every=args.every,
         rematch=not args.no_rematch, log=lambda m: print(m))
     return 0
+
+
+def cmd_merge(args) -> int:
+    """Re-merge saved speech documents, offline.
+
+    The same choice `run` and `pull` make, without the network: applying a
+    changed config should not need re-fetching, and should not need the caller
+    to know whether these recordings get interleaved or reconciled.
+    """
+    # A session folder holds the documents and the config together, so
+    # `merge *.json -c config.json` is the natural thing to type. Drop the
+    # config rather than failing on it; anything else that is not a speech
+    # document is still an error worth reporting.
+    config_path = Path(args.config).resolve() if args.config else None
+    docs = {}
+    for path in args.inputs:
+        if config_path and Path(path).resolve() == config_path:
+            continue
+        doc = json.loads(Path(path).read_text())
+        if not isinstance(doc, dict) or not doc.get("transcripts"):
+            raise OtterError(f"{path}: not an Otter speech document")
+        docs[Path(path).stem] = doc
+    if not docs:
+        raise OtterError("no speech documents given")
+    return _merge(docs, args)
 
 
 def cmd_upload(args) -> int:
@@ -808,6 +869,12 @@ def main() -> int:
     tagger.add_argument("--one", dest="every", action="store_false",
                         help="set only the first segment and rely on Otter to spread it")
     tagger.set_defaults(func=cmd_tag)
+
+    merger = sub.add_parser("merge", help="re-merge saved speech documents, offline")
+    merger.add_argument("inputs", nargs="+", metavar="SPEECH_JSON")
+    merger.add_argument("-c", "--config")
+    merger.add_argument("-o", "--output")
+    merger.set_defaults(func=cmd_merge)
 
     uploader = sub.add_parser("upload", help="send audio to Otter to transcribe")
     uploader.add_argument("path")

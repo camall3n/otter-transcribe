@@ -1,26 +1,15 @@
 #!/usr/bin/env python3
-"""Build transcript cues from Otter's `speech` JSON instead of its SRT export.
+"""Build transcript cues from Otter's per-word timings.
 
-Why not SRT
------------
-Otter's API exports SRT segmented by speaker *turn*, not by caption: one cue on
-a two-person call ran 11 minutes 40 seconds. Sorting cues by start time is how
-multi-track interleaving works, so a cue that long collapses the conversation
-into alternating monologues, and nothing in the file can undo it.
+Each segment of a speech document carries an `alignment` array with a start
+and end for every word, relative to the segment, and a `speaker_id` resolving
+against the document's `speakers` list. Two things follow, and both matter for
+interleaving several microphones into one conversation.
 
-The `speech` endpoint carries what the SRT throws away. Each segment has an
-`alignment` array with a per-word `start`/`end`, relative to the segment, and
-an explicit `speaker_id` resolving against the speech's `speakers` list. That
-removes two of the three assumptions the SRT path is built on:
-
-  - Speakers no longer need forward-filling from tag-on-change; every segment
-    says who spoke.
-  - Cue end times are no longer padded out to the next cue. Otter's padding is
-    what puts a turn's trailing words minutes before they were said, and
-    repairing it by ear was the bulk of the manual work the SRT route needed.
-    Turn boundaries are now *found* rather than repaired: a gap between
-    consecutive words longer than `gap_seconds` means the speaker stopped,
-    which on a single-speaker track is where someone else spoke.
+Every segment says who spoke, so nothing has to be carried forward from an
+earlier label. And turn boundaries are found rather than assumed: a gap longer
+than `gap_seconds` between consecutive words means the speaker stopped, which
+on a single-participant track is where somebody else was speaking.
 
 How far the timings can be trusted: not very, word by word. A word's duration
 is a flat 0.03s per character, so the position of any one word inside a run of
@@ -46,8 +35,8 @@ import re
 import sys
 from pathlib import Path
 
-from otter.transcript import (Cue, Track, find_bleed, group_turns,
-                              merge_cues, render_srt, render_text, ts)
+from otter.transcript import (Cue, Track, correct_speakers, find_bleed, group_turns,
+                              merge_cues, render_text, ts)
 
 # Otter reports segment offsets in samples at this rate.
 SAMPLE_RATE = 16000
@@ -109,8 +98,8 @@ def cues_from_speech(speech: dict, track: str, gap_seconds: float = GAP_SECONDS,
     """Split each segment into utterances at silences, timed by its words.
 
     Falls back to the segment's own offsets when a segment has no `alignment`
-    -- older recordings may predate it -- which reproduces the SRT behaviour
-    for that segment rather than dropping it.
+    -- older recordings may predate it -- so the segment keeps its own coarse
+    start and end rather than being dropped.
     """
     aliases = aliases or {}
     names = speaker_names(speech)
@@ -222,12 +211,12 @@ def find_bleed_pairs(cues: list[Cue], max_offset: float):
 
 
 def build(tracks: list[Track], config: dict):
-    """No `apply_splits` here -- exact word timings make padded cues moot."""
+    """Interleave the tracks into one stream and group it into turns."""
     cues = merge_cues(tracks, config.get("drop"))
     if config.get("auto_drop_bleed", True):
         cues = drop_bleed(cues, float(config.get("bleed_max_offset", 5.0)))
     cues.sort(key=lambda c: (c.start, c.track))
-    return cues, group_turns(cues)
+    return cues, group_turns(correct_speakers(cues, config))
 
 
 # --------------------------------------------------------------------------
@@ -239,9 +228,8 @@ def cmd_merge(args) -> int:
     speeches = {}
     for path in args.inputs:
         doc = json.loads(Path(path).read_text())
-        # A wildcard easily sweeps up the config itself, or a merged .srt's
-        # sidecar. Say which file and why, rather than failing later on an
-        # empty track with an IndexError.
+        # A wildcard easily sweeps up the config itself. Say which file and
+        # why, rather than failing later on an empty track with an IndexError.
         if not isinstance(doc, dict) or not doc.get("transcripts"):
             raise SystemExit(
                 f"{path}: not an Otter speech document (no 'transcripts').\n"
@@ -253,8 +241,9 @@ def cmd_merge(args) -> int:
         print(f"  {track.name}: {len(track.cues)} cues, "
               f"{ts(track.cues[0].start)}-{ts(track.cues[-1].end)}", file=sys.stderr)
     cues, turns = build(tracks, config)
-    text = render_srt(cues, config) if args.format == "srt" else render_text(turns, config)
+    text = render_text(turns, config)
     if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).write_text(text, encoding="utf-8")
         print(f"wrote {args.output}: {len(turns)} turns, {ts(turns[-1].end)} total",
               file=sys.stderr)
@@ -269,7 +258,6 @@ def main() -> int:
     parser.add_argument("inputs", nargs="+", help="saved speech JSON files")
     parser.add_argument("-c", "--config")
     parser.add_argument("-o", "--output")
-    parser.add_argument("-f", "--format", choices=["txt", "srt"], default="txt")
     return cmd_merge(parser.parse_args())
 
 

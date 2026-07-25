@@ -64,7 +64,8 @@ from pathlib import Path
 
 from otter.speech import (SAMPLE_RATE, UNATTRIBUTED, is_placeholder,
                           segment_speaker, speaker_names)
-from otter.transcript import Cue, Track, group_turns, render_text, ts
+from otter.transcript import (Cue, Track, correct_speakers, group_turns,
+                              render_text, ts)
 
 # Minimum matched run length to trust when estimating the offset.
 MIN_RUN = 3
@@ -76,6 +77,21 @@ class Word:
     key: str         # normalised, for alignment
     start: float
     speaker: str | None
+
+
+def aliases_for(config: dict, track: str) -> dict[str, str]:
+    """The alias map that applies to one track, in either config shape.
+
+    `scaffold` writes them nested under each track, because a label is
+    track-local: one recording's "Speaker 1" need not be another's. A
+    hand-written config for a single reconciled stream is often flat instead.
+    Both are accepted -- silently ignoring one of them meant editing the names,
+    re-running, and seeing no change and no error.
+    """
+    aliases = config.get("aliases", {})
+    if aliases and all(isinstance(v, dict) for v in aliases.values()):
+        return aliases.get(track, {})
+    return aliases
 
 
 def word_stream(speech: dict, offset: float = 0.0,
@@ -283,7 +299,30 @@ def as_words(merged: list[Merged]) -> list[Word]:
     return [Word(m.text, m.key, m.start, m.speaker) for m in merged]
 
 
-def fold(streams: list[list[Word]], log=lambda m: None) -> list[Merged]:
+def earliest_first(streams: list[list[Word]],
+                   names: list[str]) -> list[list[Word]]:
+    """Put the recording whose content starts earliest at the front.
+
+    Reconciliation shifts every track onto the first one's clock, so that
+    track's timeline becomes the output's, and passing the same recordings in
+    another order must not move a word -- a glob hands them over
+    alphabetically, which is nobody's recording order.
+
+    Whichever has the earliest first word leads, so the transcript begins where
+    the conversation does rather than after another device's leading silence.
+    The filename settles a tie, and ties are the normal case: Zoom writes every
+    track from a common t=0. Each recording is saved as its otid, so the name
+    identifies it for as long as it exists.
+    """
+    def rank(pair: tuple[str, list[Word]]) -> tuple:
+        name, words = pair
+        return ((words[0].start if words else float("inf")), name)
+
+    return [w for _, w in sorted(zip(names, streams), key=rank)]
+
+
+def fold(streams: list[list[Word]], names: list[str],
+         log=lambda m: None) -> list[Merged]:
     """Reconcile any number of recordings of one room, two at a time.
 
     Each track is folded into the running result, so the second device is
@@ -293,6 +332,7 @@ def fold(streams: list[list[Word]], log=lambda m: None) -> list[Merged]:
     """
     if len(streams) < 2:
         raise ValueError("reconciliation needs at least two recordings")
+    streams = earliest_first(streams, names)
     acc = streams[0]
     merged: list[Merged] = []
     for n, nxt in enumerate(streams[1:], start=2):
@@ -362,16 +402,17 @@ def main() -> int:
         docs.append(doc)
 
     config = json.loads(Path(args.config).read_text()) if args.config else {}
-    aliases = config.get("aliases", {})
+    names = [Path(x).stem for x in args.inputs]
     if len(docs) > 2:
         if args.offset is not None:
             raise SystemExit("--offset applies to a single pair; omit it for more")
-        merged = fold([word_stream(d, aliases=aliases) for d in docs],
+        merged = fold([word_stream(d, aliases=aliases_for(config, n))
+                       for d, n in zip(docs, names)], names,
                       log=lambda m: print(m, file=sys.stderr))
         return _render(merged, args, config)
 
-    a = word_stream(docs[0], aliases=aliases)
-    raw_b = word_stream(docs[1], aliases=aliases)
+    a = word_stream(docs[0], aliases=aliases_for(config, names[0]))
+    raw_b = word_stream(docs[1], aliases=aliases_for(config, names[1]))
     if args.offset is None:
         est = estimate_offset(a, raw_b)
         print(f"  offset {est.seconds:+.3f}s from {est.matched}/{est.total} matched "
@@ -385,7 +426,7 @@ def main() -> int:
     else:
         shift = args.offset
 
-    b = word_stream(docs[1], -shift, aliases)
+    b = word_stream(docs[1], -shift, aliases_for(config, names[1]))
     merged = reconcile(a, b, (Path(args.inputs[0]).stem, Path(args.inputs[1]).stem))
     counts = {k: sum(1 for m in merged if m.source == k)
               for k in ("both", "a", "b", "conflict")}
@@ -398,9 +439,11 @@ def main() -> int:
 
 
 def _render(merged: list[Merged], args, config: dict) -> int:
-    turns = group_turns(cues_from_merged(merged, "reconciled"))
+    turns = group_turns(correct_speakers(
+            cues_from_merged(merged, "reconciled"), config))
     text = render_text(turns, config)
     if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
         Path(args.output).write_text(text, encoding="utf-8")
         print(f"wrote {args.output}: {len(turns)} turns, {ts(turns[-1].end)} total",
               file=sys.stderr)

@@ -1,1 +1,1 @@
-"""Otter.ai glue: fetch SRT exports, merge multi-track recordings."""
+"""Otter.ai glue: fetch transcripts, merge multi-track recordings."""
