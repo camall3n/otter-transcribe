@@ -1,0 +1,15 @@
+[00:00-00:04]  ADA
+
+So the idea is that each microphone gets its own separate track.
+
+[00:06-00:08]  BO
+
+Wait, one audio file per person.
+
+[00:13-00:15]  ADA
+
+Exactly, and then the tool stitches them back together.
+
+[00:19-00:22]  BO
+
+Got it. So the timing has to line up between them.

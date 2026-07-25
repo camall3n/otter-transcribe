@@ -1,0 +1,136 @@
+{
+ "title": "track-b-bo",
+ "duration": 27,
+ "speakers": [],
+ "transcripts": [
+  {
+   "uuid": "e1bec0e6-af7e-474a-b87b-eb19ea7128d6",
+   "speaker_id": null,
+   "speaker_model_label": "1",
+   "start_offset": 105600,
+   "end_offset": 353120,
+   "transcript": "Wait, one audio file per person. Got it. So the timing has to line up between them.",
+   "alignment": [
+    {
+     "word": "Wait,",
+     "start": 0.0,
+     "end": 0.21,
+     "startOffset": 0,
+     "endOffset": 5
+    },
+    {
+     "word": "one",
+     "start": 0.66,
+     "end": 0.75,
+     "startOffset": 6,
+     "endOffset": 9
+    },
+    {
+     "word": "audio",
+     "start": 0.84,
+     "end": 1.02,
+     "startOffset": 10,
+     "endOffset": 15
+    },
+    {
+     "word": "file",
+     "start": 1.2,
+     "end": 1.38,
+     "startOffset": 16,
+     "endOffset": 20
+    },
+    {
+     "word": "per",
+     "start": 1.5,
+     "end": 1.56,
+     "startOffset": 21,
+     "endOffset": 24
+    },
+    {
+     "word": "person.",
+     "start": 1.65,
+     "end": 2.07,
+     "startOffset": 25,
+     "endOffset": 32
+    },
+    {
+     "word": "Got",
+     "start": 12.48,
+     "end": 12.66,
+     "startOffset": 33,
+     "endOffset": 36
+    },
+    {
+     "word": "it.",
+     "start": 12.66,
+     "end": 12.75,
+     "startOffset": 37,
+     "endOffset": 40
+    },
+    {
+     "word": "So",
+     "start": 13.29,
+     "end": 13.35,
+     "startOffset": 41,
+     "endOffset": 43
+    },
+    {
+     "word": "the",
+     "start": 13.44,
+     "end": 13.47,
+     "startOffset": 44,
+     "endOffset": 47
+    },
+    {
+     "word": "timing",
+     "start": 13.65,
+     "end": 13.94,
+     "startOffset": 48,
+     "endOffset": 54
+    },
+    {
+     "word": "has",
+     "start": 14.06,
+     "end": 14.15,
+     "startOffset": 55,
+     "endOffset": 58
+    },
+    {
+     "word": "to",
+     "start": 14.27,
+     "end": 14.33,
+     "startOffset": 59,
+     "endOffset": 61
+    },
+    {
+     "word": "line",
+     "start": 14.42,
+     "end": 14.57,
+     "startOffset": 62,
+     "endOffset": 66
+    },
+    {
+     "word": "up",
+     "start": 14.69,
+     "end": 14.75,
+     "startOffset": 67,
+     "endOffset": 69
+    },
+    {
+     "word": "between",
+     "start": 14.84,
+     "end": 15.2,
+     "startOffset": 70,
+     "endOffset": 77
+    },
+    {
+     "word": "them.",
+     "start": 15.38,
+     "end": 15.47,
+     "startOffset": 78,
+     "endOffset": 83
+    }
+   ]
+  }
+ ]
+}

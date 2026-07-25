@@ -1,0 +1,17 @@
+{
+  "_comment": "Names filled in, as a first run tells you to. Otter has no voiceprints for these synthetic voices, so it labels them Speaker 1 and you map them here.",
+  "tracks": {
+    "vbiVOwB3AhtzwuN3-4lf-i4JeqA": "track-a-ada",
+    "V0WXFfziZnQX9byM1shDpax4fMc": "track-b-bo"
+  },
+  "gap_seconds": 0.25,
+  "aliases": {
+    "track-a-ada": {
+      "Speaker 1": "Ada"
+    },
+    "track-b-bo": {
+      "Speaker 1": "Bo"
+    }
+  },
+  "corrections": []
+}

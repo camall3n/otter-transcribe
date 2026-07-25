@@ -1,0 +1,7 @@
+{
+  "_comment": "Two devices recording one room. Reconciliation makes a single stream, so aliases are a flat map rather than per-track.",
+  "aliases": {
+    "Speaker 1": "Ada",
+    "Speaker 2": "Bo"
+  }
+}

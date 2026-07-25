@@ -1,0 +1,27 @@
+# Secrets — never committed
+OTTER_COOKIES.txt
+OTTER_CREDENTIALS.txt
+*.token
+
+# Recordings and transcripts stay out of the repo
+transcripts/
+*.m4a
+*.wav
+*.mp3
+*.mp4
+*.aac
+*.flac
+
+# ...except the synthetic examples, which contain no real conversation
+!examples/**/*.m4a
+
+# Environment
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+uv.lock
+
+# Build output lives outside the repo; a tarball of the repo inside the
+# repo ends up inside the next tarball.
+*.tar.gz

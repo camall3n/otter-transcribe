@@ -1,0 +1,164 @@
+{
+ "title": "track-a-ada",
+ "duration": 27,
+ "speakers": [],
+ "transcripts": [
+  {
+   "uuid": "e1276ed5-9035-49dd-bdba-f2585b42cf12",
+   "speaker_id": null,
+   "speaker_model_label": "1",
+   "start_offset": 10080,
+   "end_offset": 253919,
+   "transcript": "So the idea is that each microphone gets its own separate track. Exactly, and then the tool stitches them back together.",
+   "alignment": [
+    {
+     "word": "So",
+     "start": 0.0,
+     "end": 0.06,
+     "startOffset": 0,
+     "endOffset": 2
+    },
+    {
+     "word": "the",
+     "start": 0.18,
+     "end": 0.21,
+     "startOffset": 3,
+     "endOffset": 6
+    },
+    {
+     "word": "idea",
+     "start": 0.42,
+     "end": 0.69,
+     "startOffset": 7,
+     "endOffset": 11
+    },
+    {
+     "word": "is",
+     "start": 0.75,
+     "end": 0.84,
+     "startOffset": 12,
+     "endOffset": 14
+    },
+    {
+     "word": "that",
+     "start": 0.96,
+     "end": 1.08,
+     "startOffset": 15,
+     "endOffset": 19
+    },
+    {
+     "word": "each",
+     "start": 1.14,
+     "end": 1.2,
+     "startOffset": 20,
+     "endOffset": 24
+    },
+    {
+     "word": "microphone",
+     "start": 1.35,
+     "end": 1.92,
+     "startOffset": 25,
+     "endOffset": 35
+    },
+    {
+     "word": "gets",
+     "start": 2.01,
+     "end": 2.22,
+     "startOffset": 36,
+     "endOffset": 40
+    },
+    {
+     "word": "its",
+     "start": 2.28,
+     "end": 2.4,
+     "startOffset": 41,
+     "endOffset": 44
+    },
+    {
+     "word": "own",
+     "start": 2.52,
+     "end": 2.58,
+     "startOffset": 45,
+     "endOffset": 48
+    },
+    {
+     "word": "separate",
+     "start": 2.73,
+     "end": 3.06,
+     "startOffset": 49,
+     "endOffset": 57
+    },
+    {
+     "word": "track.",
+     "start": 3.15,
+     "end": 3.45,
+     "startOffset": 58,
+     "endOffset": 64
+    },
+    {
+     "word": "Exactly,",
+     "start": 12.45,
+     "end": 12.96,
+     "startOffset": 65,
+     "endOffset": 73
+    },
+    {
+     "word": "and",
+     "start": 13.35,
+     "end": 13.47,
+     "startOffset": 74,
+     "endOffset": 77
+    },
+    {
+     "word": "then",
+     "start": 13.65,
+     "end": 13.74,
+     "startOffset": 78,
+     "endOffset": 82
+    },
+    {
+     "word": "the",
+     "start": 13.74,
+     "end": 13.77,
+     "startOffset": 83,
+     "endOffset": 86
+    },
+    {
+     "word": "tool",
+     "start": 13.77,
+     "end": 13.95,
+     "startOffset": 87,
+     "endOffset": 91
+    },
+    {
+     "word": "stitches",
+     "start": 14.04,
+     "end": 14.4,
+     "startOffset": 92,
+     "endOffset": 100
+    },
+    {
+     "word": "them",
+     "start": 14.52,
+     "end": 14.61,
+     "startOffset": 101,
+     "endOffset": 105
+    },
+    {
+     "word": "back",
+     "start": 14.67,
+     "end": 14.82,
+     "startOffset": 106,
+     "endOffset": 110
+    },
+    {
+     "word": "together.",
+     "start": 14.91,
+     "end": 15.24,
+     "startOffset": 111,
+     "endOffset": 120
+    }
+   ]
+  }
+ ]
+}
