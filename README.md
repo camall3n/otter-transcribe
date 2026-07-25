@@ -7,10 +7,12 @@ It handles **multi-track Zoom recordings**, which give very good speaker
 isolation for free, and merges them for you programmatically by talking to
 Otter's servers directly.
 
-It also handles **multi-phone recordings** — two devices on a table hearing the
+It also handles **multi-phone recordings**—two devices on a table hearing the
 same room. It aligns them automatically and uses the pair two ways: to recover
 words only one device caught, and, where they genuinely disagree, to show both
 readings rather than pick one.
+
+And if you just want to pass it a **single audio file**, you can do that too.
 
 It makes no editorial decisions about content (other than Otter's built-in
 transcription priors) unless you explicitly invoke the /otter-cleanup skill
@@ -26,7 +28,7 @@ at the bottom of the file, so you can check its work.
 
 It checks for Python 3.12+, installs the one dependency, and asks for
 a credential. Otter has no public API on personal plans, so this borrows your
-browser session — it walks you through copying one request out of developer
+browser session—it walks you through copying one request out of developer
 tools. No password is involved, and logging out revokes it.
 
 To replace it later: `python -m otter.fetch login`.
@@ -51,8 +53,7 @@ names the speakers and applies corrections.
 Otter names anyone it has a voiceprint for. Everyone else comes out as
 `Speaker 1`, and the run prints which. To give them real names, either:
 
-- put real names in that run's `config.json` under `aliases` and merge again —
-  names stay on your machine; or
+- put real names in that run's `config.json` under `aliases` and merge again—names stay on your machine; or
 - run `python -m otter.fetch tag <otid> "Speaker 1=Ada"`, which registers the
   name with Otter so that person is recognised in every later recording.
   Allow 10–15 minutes.
@@ -64,8 +65,7 @@ works out who the unnamed speakers are, proposes corrections, asks about
 anything it cannot justify, and rebuilds the file. What follows is the same
 thing by hand.
 
-You never edit the transcript. You write rules into that run's `config.json` —
-patterns, so a literal `?` or `|` needs a backslash:
+You never edit the transcript. You write rules into that run's `config.json`—patterns, so a literal `?` or `|` needs a backslash:
 
 ```json
 {
@@ -87,7 +87,7 @@ python -m otter.fetch merge <folder>/*.json -c <folder>/config.json \
     -o <folder>/transcript-clean.txt
 ```
 
-That works from documents you already have — no network, no re-upload. Write to
+That works from documents you already have—no network, no re-upload. Write to
 a new file so the original stays as your baseline.
 
 The new transcript carries its own record: the edits are in the text, and every
@@ -98,7 +98,7 @@ typed alongside it. So the file explains itself to anyone who reads it, and
 Where two recordings of the same room disagreed, you will see
 `[Goodhart's? | Goodhurt's?]` for a word and `<ADA? | BO?>` for a speaker. The
 merge leaves those alone because it cannot hear the audio, but the surrounding
-sentence usually settles them — that is what cleanup is for.
+sentence usually settles them—that is what cleanup is for.
 
 ## Other commands
 

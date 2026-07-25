@@ -2,7 +2,7 @@
 
 `room-near.m4a` and `room-far.m4a` are the same 26-second exchange captured
 twice. The "far" copy is the near one delayed by exactly 3 seconds, quietened,
-and low-passed to 2.6 kHz — a stand-in for a phone at the other end of a table.
+and low-passed to 2.6 kHz—a stand-in for a phone at the other end of a table.
 Both are synthetic; no real conversation.
 
 This is the other topology. In the Ada/Bo pair above, each file holds one
@@ -28,7 +28,7 @@ Reproduces `transcript.txt`, offline:
 
 Three things to notice.
 
-The clock offset was **recovered from the text**, not told to the tool — it
+The clock offset was **recovered from the text**, not told to the tool—it
 reports `+3.000s` from 31 of 32 matched words, with a 0.01 s spread. Devices
 started by hand share no common start time, and this is how that is found.
 
@@ -36,14 +36,14 @@ The far microphone misheard one word, so the transcript says
 `[Goodhart's? | Goodhurt's?]` rather than picking one. It cannot know which is
 right, and neither can anything downstream that has not heard the audio, so it
 records the disagreement instead of hiding it. Leave those for a human or an
-LLM pass. Words only *one* device caught are simply kept — there is nothing to
+LLM pass. Words only *one* device caught are simply kept—there is nothing to
 decide about those.
 
 The devices also disagreed about *who* said the word "I", so the speaker is
-`<ADA? | BO?>` — angle brackets for a disputed speaker, square brackets for a
+`<ADA? | BO?>`—angle brackets for a disputed speaker, square brackets for a
 disputed word, so the two can be grepped apart. Each device diarises on its own, so its cluster numbers are its
 own; they are matched up using the words the two tracks agree on. Where one
-device names a speaker and the other just could not tell, the name wins — that
+device names a speaker and the other just could not tell, the name wins—that
 is not a disagreement, it is one device knowing more. Only two competing claims
 get brackets.
 

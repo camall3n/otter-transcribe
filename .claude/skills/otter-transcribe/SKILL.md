@@ -7,7 +7,7 @@ description: Transcribe one or more audio recordings via Otter.ai and merge mult
 
 ## Run one command
 
-Run from the repo root — the directory holding `otter/`. Use `uv run python` if
+Run from the repo root—the directory holding `otter/`. Use `uv run python` if
 there is a `uv.lock`, otherwise `./.venv/bin/python`.
 
 **Given audio files:**
@@ -30,7 +30,7 @@ under `transcripts/` and prints where.
 
 No `ls`. No reading README, config or transcript files. No checking whether it
 has been transcribed already. No looking at the audio. The command inspects the
-recordings itself and reports what it found — anything you do first is a slower,
+recordings itself and reports what it found—anything you do first is a slower,
 worse version of that.
 
 If you think there is a shortcut, run the command anyway and raise the shortcut
@@ -70,7 +70,7 @@ wrote a starter config to transcripts/<date>-<id>/config.json:
 
 `Speaker N` means Otter separated that person correctly but has no voiceprint
 for them. That is normal and the transcript is complete. Do not try to work out
-who they are, and do not edit the config — say the transcript is ready and that
+who they are, and do not edit the config—say the transcript is ready and that
 `otter-cleanup` can name them from the conversation.
 
 ## Credentials
@@ -83,7 +83,7 @@ work around it.
 ## Notes
 
 - A transcript may contain `[a? | b?]` or `<Ada? | Bo?>` where two recordings
-  disagreed about a word or a speaker. Leave them — you cannot hear the audio.
+  disagreed about a word or a speaker. Leave them—you cannot hear the audio.
   Resolving them is the `otter-cleanup` skill, if the user asks.
 - These are Otter's private endpoints and they change. On a shape or status
   error, report it as-is rather than guessing at a workaround.

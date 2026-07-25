@@ -297,13 +297,13 @@ def _when(value) -> str:
         return str(value or "")[:10]
 
 
-STEPS = """  Getting the credential — Otter has no public API on this plan, so this
+STEPS = """  Getting the credential—Otter has no public API on this plan, so this
   borrows the session your browser already has.
 
     1. Log in at https://otter.ai
     2. Open developer tools:  Cmd-Opt-I  (or Menu > Tools > Browser Tools)
     3. Click the Network tab
-    4. Reload the page (Cmd-R) — the Network tab records nothing until you do,
+    4. Reload the page (Cmd-R)—the Network tab records nothing until you do,
        so it looks empty and people assume it is broken
     5. Click any row whose Domain is otter.ai
     6. Right-click that row > Copy > Copy as cURL

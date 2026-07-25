@@ -1,6 +1,6 @@
 ---
 name: otter-cleanup
-description: Review a transcript — named as an argument, or the most recent — and propose corrections — mishearings, wrong names, and the [a? | b?] and <A? | B?> markers left where two recordings disagreed. Use when the user says /otter-cleanup, or asks to clean up, correct, fix or proofread a transcript produced by otter-transcribe.
+description: Review a transcript—named as an argument, or the most recent—and propose corrections—mishearings, wrong names, and the [a? | b?] and <A? | B?> markers left where two recordings disagreed. Use when the user says /otter-cleanup, or asks to clean up, correct, fix or proofread a transcript produced by otter-transcribe.
 ---
 
 # Otter cleanup
@@ -19,7 +19,7 @@ rewritten transcript.
 2. Work out who the unnamed speakers are.
 3. Note mishearings, and resolve what you can of the disagreement markers.
 4. **Ask about everything you could not settle.** Then wait.
-5. Write all of it into the config — names, corrections — in one pass.
+5. Write all of it into the config—names, corrections—in one pass.
 6. Re-merge **once**, writing `transcript-clean.txt` into the same folder.
    `transcript.txt` is never overwritten.
 7. Report what changed and what you left.
@@ -29,10 +29,10 @@ after each idea.
 
 ## Which transcript
 
-Whichever one the user named — a path, a folder, or "the one you just made".
+Whichever one the user named—a path, a folder, or "the one you just made".
 Only if they named none:
 
-- a transcript produced earlier in this conversation — use that one
+- a transcript produced earlier in this conversation—use that one
 - otherwise `ls -td transcripts/*/ | head -3`, take the newest, and say which
   you picked before starting
 
@@ -49,7 +49,7 @@ Read `transcript.txt` and `config.json`; nothing else.
 
 ## Name the speakers first
 
-A transcript often arrives with `Speaker 1`, `Speaker 2` — Otter separated the
+A transcript often arrives with `Speaker 1`, `Speaker 2`—Otter separated the
 voices but has no voiceprint for those people. Nothing but the conversation can
 say who they are, which is why this is your job and not the tool's.
 
@@ -58,8 +58,7 @@ Read for evidence, strongest first:
 - **Someone is addressed by name and answers.** "What do you think, Ada?"
   followed by `Speaker 2` speaking makes `Speaker 2` Ada.
 - **Someone introduces themselves**, or is introduced.
-- **Someone is referred to in the third person while another speaker talks** —
-  that person is *not* the one speaking.
+- **Someone is referred to in the third person while another speaker talks**—that person is *not* the one speaking.
 - **Role or content.** The person who opens the meeting, owns the agenda,
   answers questions about their own work.
 
@@ -73,7 +72,7 @@ nested under each track name, or flat.
 Say which name rests on what, and **leave anyone you cannot place as they
 are.** A confidently wrong name is far worse than `Speaker 2`: it is invisible
 once applied, and it propagates into anything built on the transcript. If
-nobody is named anywhere in the conversation, say so — do not reach for the
+nobody is named anywhere in the conversation, say so—do not reach for the
 filename, the meeting title or a guess.
 
 Cluster numbers belong to one transcription, not to the audio. A mapping
@@ -111,7 +110,7 @@ A transcript merged from several recordings of one room carries two kinds of
 marker. They are there because the tool refused to guess; you may be able to do
 better, from context it does not have.
 
-**`[Goodhart's? | Goodhurt's?]` — the devices heard different words.** Usually
+**`[Goodhart's? | Goodhurt's?]`—the devices heard different words.** Usually
 one alternative is a real word or a name that fits the sentence and the other is
 not. Record the choice as a correction whose pattern matches the whole marker:
 
@@ -123,10 +122,10 @@ not. Record the choice as a correction whose pattern matches the whole marker:
 Some markers genuinely do not matter: `[uh? | um?]`, `[mm? | mm-hmm?]` and
 other filler where either transcription is equally true. Say so once and move
 on rather than writing an entry for each. Do not put a pair in that bucket
-because it looks small — `[our? | are?]` reads minor but the sentence almost
+because it looks small—`[our? | are?]` reads minor but the sentence almost
 always settles it, and those are worth resolving.
 
-**`<ADA? | BO?>` — the devices disagreed about who spoke.** Judge from the
+**`<ADA? | BO?>`—the devices disagreed about who spoke.** Judge from the
 conversation: who is mid-sentence either side of it, who is being addressed,
 whether it is an interjection. If the surrounding turns make it obvious, record
 it in `speaker_corrections`, which fixes the label rather than the words:
@@ -139,7 +138,7 @@ it in `speaker_corrections`, which fixes the label rather than the words:
 ```
 
 Write the pattern exactly as the transcript prints it; matching ignores case.
-If the surrounding turns do not settle it, leave it — a wrong speaker is worse
+If the surrounding turns do not settle it, leave it—a wrong speaker is worse
 than a visible question mark.
 
 A whole label being wrong is an `aliases` fix, not a correction.
@@ -150,7 +149,7 @@ A whole label being wrong is an `aliases` fix, not a correction.
   disfluencies and false starts are content, not noise.
 - Do not silently change a word because it is unusual. Jargon, names and
   technical terms are exactly what a transcript is for. Flagging one is
-  welcome — ask, or record it with an `UNRESOLVED` note; only quiet
+  welcome—ask, or record it with an `UNRESOLVED` note; only quiet
   substitution is the problem.
 - Do not resolve a marker by picking the first alternative because it is first.
   If you have no reason, say you have no reason.
@@ -164,7 +163,7 @@ writing anything, and wait for an answer.
 
 Ask about:
 
-- a speaker you cannot place, or can only place weakly — say what the evidence
+- a speaker you cannot place, or can only place weakly—say what the evidence
   was and what it does not settle
 - a marker where both alternatives are plausible in the sentence
 - anything that reads as wrong where you have no candidate: a passage that
@@ -173,7 +172,7 @@ Ask about:
 
 Do not ask about the obvious ones. If someone is addressed by name and replies,
 that is a speaker named, not a question. Ask once, as a short list, rather than
-one at a time — the user was in the room and can answer all of it in a breath.
+one at a time—the user was in the room and can answer all of it in a breath.
 
 If they do not answer, or say to skip it, leave those items alone and note them
 in the report. `UNRESOLVED` in a correction note is for something you changed
@@ -181,7 +180,7 @@ in order to flag it; something you did not change is simply left, and mentioned.
 
 ## Then apply it, once
 
-Edit the config, then re-merge offline — no network, no re-upload:
+Edit the config, then re-merge offline—no network, no re-upload:
 
 ```bash
 cd transcripts/<date>-<id>
@@ -190,13 +189,12 @@ uv run python -m otter.fetch merge *.json -c config.json -o transcript-clean.txt
 
 **Write to `transcript-clean.txt`. Never overwrite `transcript.txt`.** That file is what the
 machine produced before anyone touched it, and it is the only way to see what
-your changes actually did — `diff` the two, and every difference is something
+your changes actually did—`diff` the two, and every difference is something
 you proposed. Overwriting it destroys the baseline and makes a wrong correction
 undetectable.
 
 That one command handles either kind of recording. Do not reach for
-`otter.speech` or `otter.reconcile` directly, and do not use `run` or `pull` —
-both would go back to Otter for documents you already have.
+`otter.speech` or `otter.reconcile` directly, and do not use `run` or `pull`—both would go back to Otter for documents you already have.
 
 ## Report
 
@@ -204,7 +202,7 @@ Say what you changed and what you left. Something like: *12 corrections
 proposed, 3 markers resolved, 9 left as filler, 1 speaker disagreement judged
 from context.* Then re-run the merge and confirm the transcript regenerated.
 
-Raise anything that struck you as odd, even where you had no fix — a passage
+Raise anything that struck you as odd, even where you had no fix—a passage
 that reads as though a word is missing, a name spelled two ways, a speaker who
 appears to answer their own question. The owner was in the room and can settle
 in a second what no amount of reading can.

@@ -1,7 +1,7 @@
 # Example: two independent tracks
 
 `track-a-ada.m4a` and `track-b-bo.m4a` are 26 seconds each, synthesised with
-macOS `say` — no real conversation, nothing private. They stand in for what
+macOS `say`—no real conversation, nothing private. They stand in for what
 Zoom writes when it records each participant to their own file.
 
 The two speakers strictly alternate and never overlap, so correct interleaving
@@ -19,7 +19,7 @@ that order, two separate recordings were correctly rebuilt into one conversation
 
 ## Merge it, without spending any quota
 
-A finished run is already here — the two `.json` files are what Otter returned,
+A finished run is already here—the two `.json` files are what Otter returned,
 so the merge works offline:
 
 ```bash
@@ -30,7 +30,7 @@ python -m otter.speech \
 ```
 
 Should print `4 turns, 00:22 total` and reproduce `transcript.txt`. Name the
-input files explicitly rather than globbing `examples/separate-mics/*.json` — a glob sweeps
+input files explicitly rather than globbing `examples/separate-mics/*.json`—a glob sweeps
 in `config.json`, which is not a transcript.
 
 ## Run it for real
@@ -45,11 +45,11 @@ python -m otter.fetch run examples/separate-mics/track-a-ada.m4a examples/separa
 
 Point `-c` at a config that does *not* exist and the first run writes one,
 printing the speaker labels it found. These are synthetic voices with no
-voiceprints in your account, so expect `Speaker 1` on both tracks — the merge
+voiceprints in your account, so expect `Speaker 1` on both tracks—the merge
 keeps them apart as `TRACK-A-ADA SPEAKER 1` and `TRACK-B-BO SPEAKER 1`, because
 Speaker 1 on one recording is not the same person as Speaker 1 on another. Put
 real names against them, as `config.json` here does, and merge again with
-`otter.speech` — not `run`, which would upload the audio a second time.
+`otter.speech`—not `run`, which would upload the audio a second time.
 
 Naming two labels identically is how you say they *are* the same person: their
 turns then merge. That is the fix if one person ends up on two tracks.
