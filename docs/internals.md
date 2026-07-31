@@ -84,7 +84,7 @@ Every key is optional. A config that only names speakers is a normal config.
 | `tracks` | `{otid: name}`—the label each recording gets in the output |
 | `aliases` | rename speakers. Per-track for interleaving, flat for one room |
 | `corrections` | `{pattern, replace, note}` regexes applied at render time |
-| `speaker_corrections` | the same, applied to the speaker label instead of the words |
+| `speaker_corrections` | the same, applied to the speaker label instead of the words—or `{from, to, replace}` to move the words in a time range, splitting a turn where the range cuts it, or `{at, replace}` for a whole turn |
 | `markers` | `{at, text}`—a heading inserted at that second |
 | `header` | lines printed above the transcript |
 | `footer` | lines printed below, or omit to derive them from `corrections` |

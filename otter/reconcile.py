@@ -364,9 +364,13 @@ def cues_from_merged(merged: list[Merged], track: str) -> list[Cue]:
 
     def flush() -> None:
         if run:
+            # A reconciled word has one timestamp, not a span; end == start is
+            # enough for a range to say which side of a cut a word falls on.
+            words = [{"word": m.text, "start": m.start, "end": m.start}
+                     for m in run]
             cues.append(Cue(track, len(cues) + 1, run[0].start, run[-1].start,
                             " ".join(m.text for m in run),
-                            run[0].speaker or UNATTRIBUTED))
+                            run[0].speaker or UNATTRIBUTED, True, 0, words))
 
     for m in merged:
         if run and m.speaker != run[0].speaker:

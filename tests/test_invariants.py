@@ -82,6 +82,20 @@ def with_bleed():
     return a, b
 
 
+def one_recording():
+    """A single track, two speakers, one turn diarised to the wrong person.
+
+    The single-recording case has no second device to disagree with, so a
+    misattribution arrives unmarked: Bo's label here is the same string as
+    every other Bo turn, and no pattern can pick it out.
+    """
+    return doc("solo", [segment("s1", 1, "1", 0.5, ["alpha", "bravo", "charlie"]),
+                        segment("s2", 2, "2", 5.0, ["delta"]),
+                        segment("s3", 1, "1", 8.0, ["echo", "foxtrot"])],
+               speakers=[{"id": 1, "speaker_name": "Ada"},
+                         {"id": 2, "speaker_name": "Bo"}])
+
+
 def run_merge(tmp, docs, config=None, output="out.txt"):
     tmp.mkdir(parents=True, exist_ok=True)
     paths = []
@@ -303,6 +317,181 @@ def test_a_speaker_rule_also_applies_when_interleaving(tmp_path):
     fixed, _ = run_merge(tmp_path / "y", {"a": a, "b": b}, config, output="2.txt")
     assert any(s == "ADA" for s, _ in turns(fixed)), \
         f"rule ignored on the interleave path: {[s for s, _ in turns(fixed)]}"
+
+
+def test_a_time_settles_a_speaker_a_pattern_cannot_reach(tmp_path):
+    """One recording gives a misattributed turn no distinguishing label.
+
+    A pattern rule matches the speaker's name, which is identical on every
+    turn they took, so settling one of them by pattern relabels all of them.
+    Addressing it by time is the only way to say which cue is meant.
+    """
+    solo = one_recording()
+    before, _ = run_merge(tmp_path / "x", {"s": solo}, {}, output="1.txt")
+    assert [s for s, _ in turns(before)] == ["ADA", "BO", "ADA"]
+
+    config = {"speaker_corrections": [
+        {"at": "00:05", "replace": "Ada", "note": "context"}]}
+    after, _ = run_merge(tmp_path / "y", {"s": solo}, config, output="2.txt")
+    assert "BO" not in [s for s, _ in turns(after)], "the timed fix missed"
+    assert "SPEAKERS CORRECTED" in after and "@00:05" in after
+
+
+def test_a_timed_fix_joins_the_turn_it_belongs_to(tmp_path):
+    """Same invariant as the marker case: relabel, then group -- not the reverse.
+
+    Ada either side of a cue that was really Ada is one turn, not three.
+    """
+    config = {"speaker_corrections": [{"at": 5.0, "replace": "Ada", "note": "x"}]}
+    after, _ = run_merge(tmp_path, {"s": one_recording()}, config)
+    spoken = turns(after)
+    assert len(spoken) == 1, f"expected one merged turn, got {spoken}"
+    assert spoken[0][1].split() == ["alpha", "bravo", "charlie", "delta",
+                                    "echo", "foxtrot"]
+
+
+def test_a_timed_fix_moves_the_whole_turn_not_one_cue(tmp_path):
+    """A turn is cut into a cue per silence, and a reader cannot see the cuts.
+
+    Found on a real transcript: "it is right." was two cues, so a fix aimed at
+    it moved the word "it" to the other speaker and left "is right." behind --
+    a split turn that reads as an interruption that never happened.
+    """
+    solo = doc("solo", [segment("s1", 1, "1", 0.5, ["alpha", "bravo"]),
+                        segment("s2", 2, "2", 5.0, ["it"]),
+                        segment("s3", 2, "2", 6.0, ["is", "right"]),
+                        segment("s4", 1, "1", 9.0, ["echo"])],
+               speakers=[{"id": 1, "speaker_name": "Ada"},
+                         {"id": 2, "speaker_name": "Bo"}])
+    before, _ = run_merge(tmp_path / "x", {"s": solo}, {}, output="1.txt")
+    assert [t for _, t in turns(before)][1] == "it is right", turns(before)
+
+    config = {"speaker_corrections": [{"at": "00:05", "replace": "Ada"}]}
+    after, _ = run_merge(tmp_path / "y", {"s": solo}, config, output="2.txt")
+    assert len(turns(after)) == 1, f"the turn was split, not moved: {turns(after)}"
+
+
+def test_a_range_moves_words_out_of_the_middle_of_a_turn(tmp_path):
+    """The case no whole-turn fix can reach.
+
+    Otter attributes a whole segment to one person, so when it puts two
+    speakers in one segment there is no boundary to move: the other person's
+    words sit mid-paragraph. A range cuts the cue where the speaker actually
+    changed, which is not where a silence happened to fall.
+    """
+    solo = doc("solo", [segment("s1", 1, "1", 0.0,
+                                ["mine", "mine", "yours", "yours", "mine"],
+                                gap=1.0)],
+               speakers=[{"id": 1, "speaker_name": "Ada"}])
+    before, _ = run_merge(tmp_path / "x", {"s": solo}, {}, output="1.txt")
+    assert len(turns(before)) == 1, turns(before)
+
+    # "yours yours" starts at 2.0 and the last of them ends at 3.3.
+    config = {"speaker_corrections": [
+        {"from": 2.0, "to": 3.4, "replace": "Bo", "note": "test"}]}
+    after, _ = run_merge(tmp_path / "y", {"s": solo}, config, output="2.txt")
+    assert [(s, t) for s, t in turns(after)] == [
+        ("ADA", "mine mine"), ("BO", "yours yours"), ("ADA", "mine")], turns(after)
+
+
+def test_a_range_written_as_the_transcript_prints_it_covers_the_whole_second(tmp_path):
+    """MM:SS is floored on the way out, so it must be generous on the way in.
+
+    A turn printed as ending 00:03 has words running to 00:03.9; a range
+    copied off the page that stopped at 00:03.0 would leave them behind.
+    """
+    solo = doc("solo", [segment("s1", 1, "1", 0.0,
+                                ["mine", "yours", "yours"], gap=1.7)],
+               speakers=[{"id": 1, "speaker_name": "Ada"}])
+    config = {"speaker_corrections": [
+        {"from": "00:01", "to": "00:03", "replace": "Bo"}]}   # last word at 3.4
+    after, _ = run_merge(tmp_path, {"s": solo}, config)
+    assert [(s, t) for s, t in turns(after)] == [
+        ("ADA", "mine"), ("BO", "yours yours")], turns(after)
+
+
+def test_overlapping_ranges_are_an_error(tmp_path):
+    """Nose-to-tail ranges share a second, and the later one wins silently.
+
+    `to` covers the whole second -- the transcript floors on the way out, so a
+    range copied off the page has to be generous on the way in -- and `from`
+    starts at the top of one. So ranges written nose to tail overlap, the third
+    rule below takes back the word the second moved, and Bo vanishes from a
+    transcript whose config plainly names him.
+
+    Partitioning a block into three ranges is the recommended way to refine a
+    decision, which makes nose to tail the natural thing to write. Caught
+    before anything is written rather than left to the reader: the alternative
+    was noticing a missing speaker in the output, which is exactly the kind of
+    attention this tool exists to stop spending.
+    """
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    solo = doc("solo", [segment("s1", 1, "1", 10.0,
+                                ["one", "two", "three", "four", "five", "six"],
+                                gap=1.0)],
+               speakers=[{"id": 1, "speaker_name": "Cass"}])
+    (tmp_path / "s.json").write_text(json.dumps(solo))
+    (tmp_path / "config.json").write_text(json.dumps({"speaker_corrections": [
+        {"from": "00:10", "to": "00:12", "replace": "Ada"},
+        {"from": "00:12", "to": "00:12", "replace": "Bo"},
+        {"from": "00:12", "to": "00:15", "replace": "Ada"}]}))
+    result = subprocess.run(
+        [sys.executable, "-m", "otter.fetch", "merge", str(tmp_path / "s.json"),
+         "-c", str(tmp_path / "config.json"), "-o", str(tmp_path / "out.txt")],
+        cwd=ROOT, capture_output=True, text=True)
+    assert result.returncode != 0, "overlapping ranges were accepted"
+    assert "overlap" in result.stderr and "00:12" in result.stderr, result.stderr
+    assert not (tmp_path / "out.txt").exists(), \
+        "a transcript was written from an ambiguous config"
+
+
+def test_ranges_on_distinct_seconds_partition_a_block(tmp_path):
+    """The correct form of the above: three ranges, three blocks, no overlap.
+
+    This is the pattern the skill recommends for refining a decision about a
+    block -- Ada / Bo / Ada rather than a block rule plus an exception -- so it
+    has to keep working once overlap is rejected.
+    """
+    solo = doc("solo", [segment("s1", 1, "1", 10.0,
+                                ["one", "two", "three", "four", "five", "six"],
+                                gap=1.0)],
+               speakers=[{"id": 1, "speaker_name": "Cass"}])
+    config = {"speaker_corrections": [
+        {"from": "00:10", "to": "00:11", "replace": "Ada"},
+        {"from": "00:12", "to": "00:12", "replace": "Bo"},
+        {"from": "00:13", "to": "00:15", "replace": "Ada"}]}
+    out, _ = run_merge(tmp_path, {"s": solo}, config)
+    assert [(s, t) for s, t in turns(out)] == [
+        ("ADA", "one two"), ("BO", "three"), ("ADA", "four five six")], turns(out)
+
+
+def test_a_range_that_holds_no_words_is_an_error(tmp_path):
+    """Same rule as a time that names no cue: never claim a fix that did not run."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "s.json").write_text(json.dumps(one_recording()))
+    (tmp_path / "config.json").write_text(json.dumps({"speaker_corrections": [
+        {"from": "04:00", "to": "04:10", "replace": "Ada"}]}))
+    result = subprocess.run(
+        [sys.executable, "-m", "otter.fetch", "merge", str(tmp_path / "s.json"),
+         "-c", str(tmp_path / "config.json"), "-o", str(tmp_path / "out.txt")],
+        cwd=ROOT, capture_output=True, text=True)
+    assert result.returncode != 0 and "04:00" in result.stderr
+    assert not (tmp_path / "out.txt").exists()
+
+
+def test_a_time_that_names_no_cue_is_an_error_not_a_silent_pass(tmp_path):
+    """A fix that quietly matched nothing would still be claimed in the footer."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "s.json").write_text(json.dumps(one_recording()))
+    (tmp_path / "config.json").write_text(json.dumps({"speaker_corrections": [
+        {"at": "04:00", "replace": "Ada", "note": "nothing is there"}]}))
+    result = subprocess.run(
+        [sys.executable, "-m", "otter.fetch", "merge", str(tmp_path / "s.json"),
+         "-c", str(tmp_path / "config.json"), "-o", str(tmp_path / "out.txt")],
+        cwd=ROOT, capture_output=True, text=True)
+    assert result.returncode != 0, "a fix that matched nothing was reported as applied"
+    assert "04:00" in result.stderr
+    assert not (tmp_path / "out.txt").exists(), "wrote a transcript it could not honour"
 
 
 def test_saved_documents_carry_no_credentials_or_emails():

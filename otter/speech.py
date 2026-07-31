@@ -153,8 +153,10 @@ def cues_from_speech(speech: dict, track: str, gap_seconds: float = GAP_SECONDS,
 def _cue(track: str, idx: int, base: float, words: list[dict], who: str,
          attributed: bool, segment_words: int) -> Cue:
     text = " ".join(w["word"] for w in words).strip()
+    timed = [{"word": w["word"], "start": base + w["start"], "end": base + w["end"]}
+             for w in words]
     return Cue(track, idx, base + words[0]["start"], base + words[-1]["end"],
-               text, who, attributed, segment_words)
+               text, who, attributed, segment_words, timed)
 
 
 # --------------------------------------------------------------------------

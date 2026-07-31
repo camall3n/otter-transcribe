@@ -80,7 +80,34 @@ You never edit the transcript. You write rules into that run's `config.json`—p
 ```
 
 `corrections` change the words, `speaker_corrections` change who a turn belongs
-to. Then rebuild:
+to.
+
+A pattern needs a label to match. Reconciling two recordings gives a disputed
+turn one of its own—`<ADA? | BO?>`—but a single recording has no second opinion,
+so a turn diarised to the wrong person is labelled just like every other turn
+that person took. Name the time instead, as the transcript prints it:
+
+```json
+  "speaker_corrections": [
+    {"from": "26:28", "to": "26:29", "replace": "Bo",
+     "note": "finishing their own sentence"}
+  ]
+```
+
+That gives every word in the range to Bo, splitting the paragraph if the
+range starts or ends inside one—which is what you need when Otter puts two
+people in one block of text and there is no break to move. A `to` written as
+MM:SS covers that whole second, so a range copied off the transcript picks up
+the words the printed timestamp rounded away.
+
+When the stretch is exactly one turn, which is the usual case, `{"at": "26:28",
+"replace": "Bo"}` says so without the second timestamp; it merges into the
+neighbouring turn if the same person was already speaking either side of it.
+Add `"track"` to either form to disambiguate when two recordings both have
+words at that moment. A range or time that matches nothing is an error, not a
+silent no-op.
+
+Then rebuild:
 
 ```bash
 python -m otter.fetch merge <folder>/*.json -c <folder>/config.json \
@@ -116,3 +143,11 @@ offline with no account needed.
 
 `docs/internals.md` covers how the merge decides between the two kinds of
 recording, every config key, and the Otter API's sharper edges.
+
+## History
+
+This repo previously held **Longhand**, a fully-local transcription and
+speaker-attribution pipeline. It was measured against Otter and retired; the
+reasoning, the time ledger, and the lessons are in `RETRO.md` (Retro 6) and
+`docs/EXPERIMENT.md`. The code is gone from the working tree but remains in
+git history.

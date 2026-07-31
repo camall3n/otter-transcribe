@@ -89,7 +89,7 @@ recordings without any of this. It queues a re-match taking 10–15 minutes.
 Read the transcript, then add to `corrections` in its config:
 
 ```json
-{"pattern": "\\bGodal\\b", "replace": "Gödel", "note": "Cam, ~33:26"}
+{"pattern": "\\bGodal\\b", "replace": "Gödel", "note": "Ada, ~33:26"}
 ```
 
 These accumulate in the config; nothing is applied until the final merge.
@@ -141,7 +141,82 @@ Write the pattern exactly as the transcript prints it; matching ignores case.
 If the surrounding turns do not settle it, leave it—a wrong speaker is worse
 than a visible question mark.
 
+**Words attributed to the wrong person with no marker at all.** One recording
+has nothing to disagree with it, so a slip arrives unflagged, and the label is
+the same string as every other turn that speaker took—a pattern would move all
+of them. Name the time instead, copied from the transcript:
+
+```json
+"speaker_corrections": [
+  {"from": "26:28", "to": "26:29", "replace": "Bo",
+   "note": "finishing their own sentence"}
+]
+```
+
+The range moves exactly the words inside it, splitting a turn where it cuts
+one—which is the only way to fix the case where someone else's words sit in
+the middle of a paragraph with no break around them. Where the stretch is a
+whole turn, `{"at": "26:28", "replace": "Bo"}` says that in one timestamp,
+and merges it into the turn either side if that was the same speaker—so expect
+the turn count to drop.
+
+Both are worth looking for in a single-recording transcript: a short turn that
+answers itself or completes the previous speaker's sentence, and a paragraph
+that changes voice partway through.
+
 A whole label being wrong is an `aliases` fix, not a correction.
+
+## Do not let one rule feed another
+
+Rules run in order, each over the text the one before it produced. So a rule
+whose replacement some other rule matches will fire twice, and the transcript
+shows no sign of it:
+
+```json
+{"pattern": "Ada", "replace": "Bo"}
+{"pattern": "Bo",  "replace": "Cass"}
+```
+
+Ada's turns come out as Cass. The same holds for word corrections.
+
+Before writing, read your own list and check that no `replace` value appears in
+another rule's `pattern`. Where two rules want the same word, write each against
+what the transcript actually says, not against what another rule leaves behind—
+one rule per outcome. If that cannot be arranged, the rules are fighting over
+something you have not settled yet; settle it, then write one rule.
+
+### Refining a block: say what each part is
+
+The case this comes up in: a long `Unattributed` block you decide is Ada, and
+then a "yeah yeah" inside it that is obviously Bo. Do not write "the block is
+Ada" and carve an exception out of it—that is a rule that only works if another
+rule ran first. Say what each part is, and let the three entries stand alone:
+
+```json
+"speaker_corrections": [
+  {"from": "41:02", "to": "41:37", "replace": "Ada"},
+  {"from": "41:38", "to": "41:39", "replace": "Bo", "note": "\"yeah yeah\""},
+  {"from": "41:40", "to": "42:15", "replace": "Ada"}
+]
+```
+
+Three entries, three blocks in the transcript, each one checkable on its own
+against what you read. Expect the turn count to rise, the way `at` makes it
+fall.
+
+**Adjacent ranges must not share a second.** A `to` written as MM:SS covers all
+of that second and a `from` starts at the top of it, so ranges written nose to
+tail overlap—and the later one would take the words back, leaving one block
+where you wrote three. The merge refuses to run on overlapping ranges and says
+which two, so this is a message you will see rather than a transcript you have
+to check. Leave a second between them, as above. Where the speaker changes
+mid-second and that will not do, write the boundary as a decimal number of
+seconds: numbers are matched exactly, MM:SS is not.
+
+Do not reach for `aliases` to settle this instead. It renames a placeholder
+everywhere it appears in the recording, so it answers "who is Speaker 2" and
+not "who spoke here"—and if another `Unattributed` stretch elsewhere is someone
+else, it will quietly claim that too.
 
 ## What not to do
 
