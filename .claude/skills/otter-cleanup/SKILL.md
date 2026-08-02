@@ -16,15 +16,17 @@ rewritten transcript.
 ## The order
 
 1. Read the transcript the user named, and its config.
-2. Work out who the unnamed speakers are.
-3. Note mishearings, and resolve what you can of the disagreement markers.
-4. **Ask about everything you could not settle.** Then wait.
-5. Write all of it into the config—names, corrections—in one pass.
-6. Re-merge **once**, writing `transcript-clean.txt` into the same folder.
+2. Infer what the recording was called, from the config and the folder.
+3. Work out who the unnamed speakers are.
+4. Note mishearings, and resolve what you can of the disagreement markers.
+5. **Ask about everything you could not settle**, and confirm the inferred
+   name while you are there. Then wait.
+6. Write all of it into the config—names, corrections—in one pass.
+7. Re-merge **once**, writing `<recording>.txt` into the same folder.
    `transcript.txt` is never overwritten.
-7. Report what changed and what you left.
+8. Report what changed and what you left.
 
-Nothing is written until step 5 and nothing runs until step 6. Do not merge
+Nothing is written until step 6 and nothing runs until step 7. Do not merge
 after each idea.
 
 ## Which transcript
@@ -43,9 +45,47 @@ transcripts/<date>-<id>/
     transcript.txt        what the machine produced
     config.json           every decision, as data
     <otid>.json           what Otter returned, one per recording
+    <recording>.m4a       the audio, where it has been moved in beside them
 ```
 
 Read `transcript.txt` and `config.json`; nothing else.
+
+## Work out what the recording was called
+
+**Infer it; do not ask.** The folder is named for the day the audio was
+transcribed, which is not the day the conversation happened, and nothing inside
+the transcript says where the audio came from. The name a person gave the
+recording usually carries both: `audio-2026-06-01-ada-bo.m4a` holds a date
+and a roster that the transcript cannot.
+
+In order of directness:
+
+- `config.json` → `tracks`, whose values are the file stems Otter was given
+- an audio file sitting in the run folder beside the transcript
+- the folder or transcript path the user named when they invoked you
+
+**There may be more than one.** A room recorded on two phones arrives as two
+tracks, and the interesting part is what they share: `...-mic0-seminar-where-do-...`
+and `...-mic1-seminar-where-do-...` want the common stem, with the per-device part
+dropped. Earlier runs already do this—see
+`audio-2026-07-27-web-manifesto-ada-bo.txt`.
+
+**Confirm what you inferred** in the same batch of questions you were going to
+ask anyway (below); it costs the user nothing to glance at. Only when the names
+are too generic to infer from—`recording.m4a`, `audio1.m4a`, `Zoom_0.mp4`—ask,
+and ask for the *output filename* you should use rather than for the recording's.
+
+What a filename settles, and what it does not:
+
+- **The date.** Record it in the config `_comment`, because the folder name
+  will disagree and the filename is the one that means anything. A transcript
+  nobody can date is much less useful a year later.
+- **The roster.** Knowing which names to expect makes the conversational
+  evidence easier to recognise when you reach it.
+- **Never the mapping.** `ada-bo` does not make the first speaker Ada.
+  Order in a filename is arbitrary, tracks come back in whatever order Otter
+  returns them, and the two need not agree. Confirm every name against the
+  conversation, exactly as below.
 
 ## Name the speakers first
 
@@ -72,8 +112,9 @@ nested under each track name, or flat.
 Say which name rests on what, and **leave anyone you cannot place as they
 are.** A confidently wrong name is far worse than `Speaker 2`: it is invisible
 once applied, and it propagates into anything built on the transcript. If
-nobody is named anywhere in the conversation, say so—do not reach for the
-filename, the meeting title or a guess.
+nobody is named anywhere in the conversation, say so. A filename or a meeting
+title is a hypothesis to confirm against what people say, never a substitute
+for it—and a guess is not even that.
 
 Cluster numbers belong to one transcription, not to the audio. A mapping
 written for one set of documents may not hold for a later re-upload of the same
@@ -259,14 +300,20 @@ Edit the config, then re-merge offline—no network, no re-upload:
 
 ```bash
 cd transcripts/<date>-<id>
-uv run python -m otter.fetch merge *.json -c config.json -o transcript-clean.txt
+uv run python -m otter.fetch merge *.json -c config.json -o <recording>.txt
 ```
 
-**Write to `transcript-clean.txt`. Never overwrite `transcript.txt`.** That file is what the
-machine produced before anyone touched it, and it is the only way to see what
-your changes actually did—`diff` the two, and every difference is something
-you proposed. Overwriting it destroys the baseline and makes a wrong correction
-undetectable.
+Name the output after the recording, with no suffix—
+`audio-2026-06-01-ada-bo.txt`—so it matches the audio it came from and says
+on its face which conversation it is and when. The folder name cannot: it is
+the transcription date. Fall back to `transcript-clean.txt` only when there was
+nothing to infer a name from and the user did not give you one.
+
+**Never overwrite `transcript.txt`,** whatever you call the output. That file
+is what the machine produced before anyone touched it, and it is the only way
+to see what your changes actually did—`diff` the two, and every difference is
+something you proposed. Overwriting it destroys the baseline and makes a wrong
+correction undetectable.
 
 That one command handles either kind of recording. Do not reach for
 `otter.speech` or `otter.reconcile` directly, and do not use `run` or `pull`—both would go back to Otter for documents you already have.
