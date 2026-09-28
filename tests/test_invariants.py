@@ -574,3 +574,63 @@ def test_a_scrubbed_document_still_reads_as_finished():
     assert ready(finished)[0], "fixture is wrong: the raw document is finished"
     done, state = ready(scrub(finished))
     assert done, f"scrub hid the readiness flags; poller would spin: {state}"
+
+
+def test_words_otter_never_heard_can_be_put_back(tmp_path):
+    """A dropped utterance is absent, not wrong, so no correction reaches it.
+
+    An insertion states the words at a time, in the mouth of whoever the
+    listener heard; it takes its place in the stream and the footer says it
+    was typed rather than transcribed.
+    """
+    solo = doc("solo", [segment("s1", 1, "1", 0.0, ["mine", "mine"], gap=1.0),
+                        segment("s2", 1, "1", 6.0, ["mine", "again"], gap=1.0)],
+               speakers=[{"id": 1, "speaker_name": "Ada"}])
+    config = {"insertions": [
+        {"at": 3.0, "who": "Bo", "text": "yours", "note": "test"}]}
+    after, _ = run_merge(tmp_path / "y", {"s": solo}, config, output="2.txt")
+    assert [(s, t) for s, t in turns(after)] == [
+        ("ADA", "mine mine"), ("BO", "yours"), ("ADA", "mine again")], turns(after)
+    assert "WORDS INSERTED (1)" in after and 'Bo: "yours"' in after
+
+    bad = {"insertions": [{"at": 3.0, "text": "yours"}]}
+    with pytest.raises(Exception, match="who"):
+        run_merge(tmp_path / "z", {"s": solo}, bad, output="3.txt")
+
+
+def test_an_insertion_joins_the_turn_of_whoever_is_already_speaking(tmp_path):
+    """A word Otter dropped mid-sentence goes back into that sentence.
+
+    The inserted cue has no special standing: given to the speaker either
+    side of it, it fuses into their turn rather than splitting it in three.
+    """
+    solo = doc("solo", [segment("s1", 1, "1", 0.0, ["mine", "mine"], gap=1.0),
+                        segment("s2", 1, "1", 6.0, ["mine", "again"], gap=1.0)],
+               speakers=[{"id": 1, "speaker_name": "Ada"}])
+    config = {"insertions": [
+        {"at": 3.0, "who": "Ada", "text": "still", "note": "test"}]}
+    after, _ = run_merge(tmp_path / "y", {"s": solo}, config, output="2.txt")
+    assert [(s, t) for s, t in turns(after)] == [
+        ("ADA", "mine mine still mine again")], turns(after)
+
+
+def test_a_range_over_an_insertion_time_does_not_trip_on_it(tmp_path):
+    """Insertions land after the speaker corrections have run.
+
+    An inserted cue has no word timings, and a range that only partly covers
+    an untimed cue is an error by design. Running insertions last means a
+    range and an insertion can share a stretch of time without that error --
+    the range moves what Otter heard, the insertion adds what it did not.
+    """
+    solo = doc("solo", [segment("s1", 1, "1", 0.0,
+                                ["mine", "mine", "yours", "yours", "mine"],
+                                gap=1.0)],
+               speakers=[{"id": 1, "speaker_name": "Ada"}])
+    config = {
+        "speaker_corrections": [
+            {"from": 2.0, "to": 3.4, "replace": "Bo", "note": "test"}],
+        "insertions": [
+            {"at": 2.5, "who": "Bo", "text": "truly", "note": "test"}]}
+    after, _ = run_merge(tmp_path / "y", {"s": solo}, config, output="2.txt")
+    assert [(s, t) for s, t in turns(after)] == [
+        ("ADA", "mine mine"), ("BO", "yours truly yours"), ("ADA", "mine")], turns(after)

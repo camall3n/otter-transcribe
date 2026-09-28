@@ -207,6 +207,39 @@ that changes voice partway through.
 
 A whole label being wrong is an `aliases` fix, not a correction.
 
+## Put back words that were never transcribed
+
+Sometimes Otter drops an utterance entirely. Nothing is misheard; the words
+are simply absent, so no correction can reach them. The sign is a gap: a turn
+that stops mid-thought, a reply to something nobody said, or the user giving
+you a line that is not in the transcript at all. Check the gap against the
+`<otid>.json` alignment before assuming it is missing rather than elsewhere.
+
+Only the user can supply the words—never write an insertion from inference.
+State them at a time, in the mouth of whoever the user heard:
+
+```json
+"insertions": [
+  {"at": "26:31", "who": "Bo", "text": "and the second one never converged",
+   "note": "not transcribed; from the audio, per the user"}
+]
+```
+
+The footer lists every insertion under its own heading, so the transcript says
+which words were typed rather than transcribed. An insertion beside the same
+speaker fuses into their turn.
+
+## Stitch the user's answers into what is there
+
+When the user answers from the audio, they usually quote only the span in
+question. Replace the words they changed and keep the transcript's own words
+around them.
+
+Their answers are informal, and marks like `[...]` do not have one fixed
+meaning. Sometimes one stands in for words already there, and sometimes it
+marks audio nobody can make out and belongs in the transcript. Read it in
+context, and ask when you cannot tell. Do not drop anything the user wrote.
+
 ## Do not let one rule feed another
 
 Rules run in order, each over the text the one before it produced. So a rule

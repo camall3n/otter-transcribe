@@ -103,6 +103,22 @@ the words the printed timestamp rounded away.
 When the stretch is exactly one turn, which is the usual case, `{"at": "26:28",
 "replace": "Bo"}` says so without the second timestamp; it merges into the
 neighbouring turn if the same person was already speaking either side of it.
+
+Occasionally Otter drops a short utterance altogether: nothing is misheard,
+the words are simply not there, and no correction can reach text that does
+not exist. `insertions` put them back, at a time and attributed to whoever
+the listener heard:
+
+```json
+  "insertions": [
+    {"at": "26:31", "who": "Bo",
+     "text": "and the second one never converged",
+     "note": "not transcribed; from the audio"}
+  ]
+```
+
+The footer lists every insertion separately, so the transcript says which of
+its words were typed rather than transcribed.
 Add `"track"` to either form to disambiguate when two recordings both have
 words at that moment. A range or time that matches nothing is an error, not a
 silent no-op.

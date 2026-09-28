@@ -273,7 +273,7 @@ def correct_speakers(cues: list[Cue], config: dict) -> list[Cue]:
     """
     fixes = config.get("speaker_corrections", [])
     if not fixes:
-        return cues
+        return insert_missing(cues, config)
     for f in fixes:
         if ("from" in f) != ("to" in f):
             raise ValueError(f"speaker_corrections: a range needs both "
@@ -319,9 +319,45 @@ def correct_speakers(cues: list[Cue], config: dict) -> list[Cue]:
     for fix in timed:
         for cue in _cues_at(cues, fix):
             retitled[id(cue)] = fix["replace"]
-    return [replace(c, who=retitled.get(
+    return insert_missing([replace(c, who=retitled.get(
         id(c), apply_corrections(c.who or "", patterns, ignore_case=True)))
-        for c in cues]
+        for c in cues], config)
+
+
+def insert_missing(cues: list[Cue], config: dict) -> list[Cue]:
+    """Put back words the recording has and the transcription does not.
+
+    Otter occasionally drops a short utterance outright -- nothing is misheard
+    or misattributed, the words are simply absent -- and no correction can
+    reach text that is not there. An insertion states them at a time,
+    attributed to whoever the listener heard:
+
+        {"at": "26:31", "who": "Bo",
+         "text": "and the second one never converged",
+         "note": "not transcribed; from the audio"}
+
+    The cue carries no word timings, so a range cannot cut it, and it joins
+    its neighbours' turns like any other cue. Applied after the speaker
+    corrections so those never have to step around it. Listed in the footer:
+    the transcript says which of its words were typed rather than heard.
+    """
+    added = config.get("insertions", [])
+    if not added:
+        return cues
+    out = list(cues)
+    for ins in added:
+        missing = {"at", "who", "text"} - set(ins)
+        if missing:
+            raise ValueError(f"insertions: each needs \"at\", \"who\" and "
+                             f"\"text\"; {sorted(missing)} missing from {ins}")
+        at = parse_time(ins["at"])
+        end = parse_time(ins["to"], end=True) if "to" in ins else at
+        track = ins.get("track") or (
+            min(out, key=lambda c: abs(c.start - at)).track if out else "inserted")
+        cue = Cue(track, -1, at, end, ins["text"], ins["who"], attributed=False)
+        after = next((i for i, c in enumerate(out) if c.start > at), len(out))
+        out.insert(after, cue)
+    return out
 
 
 def group_turns(cues: list[Cue]) -> list[Turn]:
@@ -375,8 +411,9 @@ def derive_footer(config: dict) -> list[str]:
              if not str(c.get("note", "")).upper().startswith("UNRESOLVED")]
     open_ = [c for c in corrections if c not in fixed]
     speakers = config.get("speaker_corrections", [])
+    inserted = config.get("insertions", [])
     dropped = config.get("drop", [])
-    if not (fixed or open_ or speakers or dropped):
+    if not (fixed or open_ or speakers or inserted or dropped):
         return []
 
     def show(pattern: str) -> str:
@@ -401,7 +438,7 @@ def derive_footer(config: dict) -> list[str]:
         return f"@{when}" + (f" [{c['track']}]" if c.get("track") else "")
     # One long alternation should not stretch every other row.
     width = min(max((len(label(c))
-                     for c in corrections + speakers), default=0), 38)
+                     for c in corrections + speakers + inserted), default=0), 38)
     out = ["=" * 78, ""]
 
     if fixed:
@@ -421,6 +458,12 @@ def derive_footer(config: dict) -> list[str]:
         for c in speakers:
             note = f"   ({c['note']})" if c.get("note") else ""
             out.append(f"  {label(c):<{width}}  ->  {c['replace']}{note}")
+        out.append("")
+    if inserted:
+        out += [f"WORDS INSERTED ({len(inserted)}) -- typed from the audio, not transcribed", ""]
+        for c in inserted:
+            note = f"   ({c['note']})" if c.get("note") else ""
+            out.append(f"  {label(c):<{width}}  {c['who']}: \"{c['text']}\"{note}")
         out.append("")
     if dropped:
         out += [f"CUES DROPPED ({len(dropped)})", ""]
