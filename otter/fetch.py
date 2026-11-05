@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import time
@@ -368,6 +369,13 @@ def read_paste(prompt: str) -> str:
     the moment this exits.
 
     Echo is off for the whole read, so the credential stays out of scrollback.
+
+    Line editing is off too, and that part is not optional. In canonical mode
+    the terminal buffers each line itself, and macOS caps that buffer at 1024
+    bytes (MAX_CANON). The cookie line alone runs to several kilobytes, so the
+    terminal stops accepting input partway through it and the read never sees
+    a newline: the paste just hangs. Reading bytes as they arrive avoids the
+    limit. Ctrl-C still works, since signals are left alone.
     """
     sys.stderr.write(prompt)
     sys.stderr.flush()
@@ -377,14 +385,17 @@ def read_paste(prompt: str) -> str:
         fd = sys.stdin.fileno()
         saved = termios.tcgetattr(fd)
         quiet = termios.tcgetattr(fd)
-        quiet[3] &= ~termios.ECHO
+        quiet[3] &= ~(termios.ECHO | termios.ICANON)
+        quiet[6][termios.VMIN] = 1
+        quiet[6][termios.VTIME] = 0
         termios.tcsetattr(fd, termios.TCSADRAIN, quiet)
     except Exception:
-        pass                              # not a terminal; read plainly
+        saved = None                      # not a terminal; read plainly
     lines: list[str] = []
     try:
-        for line in sys.stdin:
-            body = line.rstrip("\n")
+        source = sys.stdin if saved is None else _raw_lines(fd)
+        for line in source:
+            body = line.rstrip("\r\n")
             lines.append(body.rstrip("\\"))
             if not body.rstrip().endswith("\\"):
                 break
@@ -394,6 +405,23 @@ def read_paste(prompt: str) -> str:
             termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, saved)
         sys.stderr.write("\n")
     return " ".join(lines)
+
+
+def _raw_lines(fd: int):
+    """Yield lines from a terminal with line editing off.
+
+    Without canonical mode the terminal no longer turns Ctrl-D into EOF, so
+    that is done here, to keep it a way out of the prompt.
+    """
+    pending = b""
+    while True:
+        chunk = os.read(fd, 65536)
+        if not chunk or b"\x04" in chunk:
+            raise EOFError
+        pending += chunk.replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+        while b"\n" in pending:
+            line, pending = pending.split(b"\n", 1)
+            yield line.decode("utf-8", errors="replace") + "\n"
 
 
 def cmd_login(args) -> int:
