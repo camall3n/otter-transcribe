@@ -94,7 +94,8 @@ def segment_speaker(segment: dict, names: dict[int, str], anonymous: bool) -> st
 
 
 def cues_from_speech(speech: dict, track: str, gap_seconds: float = GAP_SECONDS,
-                     aliases: dict[str, str] | None = None) -> list[Cue]:
+                     aliases: dict[str, str] | None = None,
+                     qualify: bool = True) -> list[Cue]:
     """Split each segment into utterances at silences, timed by its words.
 
     Falls back to the segment's own offsets when a segment has no `alignment`
@@ -127,8 +128,10 @@ def cues_from_speech(speech: dict, track: str, gap_seconds: float = GAP_SECONDS,
         # whether an alias fired -- a scaffolded config maps "Speaker 1" to
         # itself, which is an alias hit that resolves nothing. Real names pass
         # through untouched, since one person may appear on several tracks.
+        # A single recording has no other track to confuse them with, so
+        # there the prefix is noise and `qualify` is off.
         who = aliases.get("*") or aliases.get(raw) or raw
-        if is_placeholder(who, names):
+        if qualify and is_placeholder(who, names):
             who = f"{track} {who}"
         words = segment.get("alignment") or []
 
@@ -171,7 +174,8 @@ def tracks_from_speeches(speeches: dict[str, dict], config: dict) -> list[Track]
     for otid, speech in speeches.items():
         name = names.get(otid, otid)
         tracks.append(Track(name, cues_from_speech(
-            speech, name, gap, config.get("aliases", {}).get(name, {}))))
+            speech, name, gap, config.get("aliases", {}).get(name, {}),
+            qualify=len(speeches) > 1)))
     return tracks
 
 
